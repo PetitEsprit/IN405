@@ -6,32 +6,29 @@
 
 int fgen(int m, int ninit)
 {
-	if(m ==0) return 0;
+	if(m == 0) return 0;
+	int i,nbfils, nbpfils;
+	pid_t pid;
+	fflush(stdout); //flush the f-ing memory
 	
-	int i;
-	int n = ninit;
-	int nbfils = 0;
-	int nbpetitfils = 0;
-	
-	pid_t pid = 1;
-	while(pid > 0 && 0 < n) //pere crée m fils
-	{	
-		pid = fork();
-		if(pid==0)printf("WAAH;");
-		n--;
-		nbfils++;//plus de fils!
-	}
-	if(pid==0 && m > 0) //si fils crée d'autre fils(il est le pere de ses fils)
+	i = 0; nbfils = 0; nbpfils = 0;
+	while(i<ninit)
 	{
-		fgen(m-1,ninit);
+		if((pid = fork()) == 0)
+		{
+			printf("WAAH\n");
+			fgen(m-1, ninit);
+			exit(ninit);
+		}
+			i++;
 	}
 
-	i = 0;
-	while(i<nbfils)
+	nbpfils = 0;nbfils = ninit;
+	
+	for(i=0;i<ninit;i++)
 	{
-		wait(&nbpetitfils);
-		nbfils += WEXITSTATUS(nbpetitfils);
-		i++;
+		wait(&nbpfils);
+		nbfils += WEXITSTATUS(nbpfils); 
 	}
 	return nbfils;
 }
@@ -39,7 +36,8 @@ int fgen(int m, int ninit)
 int main()
 {
 	const int minit = 2;
-	const int ninit = 3;
-	fgen(minit, ninit);
+	const int ninit = 2;
+	int i = fgen(minit, ninit);
+	printf("i : %d\n", i);
 	return 0;
 }

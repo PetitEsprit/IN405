@@ -17,6 +17,7 @@ int main()
 			printf("FILS: SECONDE %d !", i);
 			sleep(1);
 		}
+		exit(0);
 	}
 	else
 	{
@@ -24,6 +25,7 @@ int main()
 		kill(pid,SIGSTOP);
 		sleep(5);
 		kill(pid,SIGCONT);
+		wait(NULL);
 	}
 	return 0;
 }
