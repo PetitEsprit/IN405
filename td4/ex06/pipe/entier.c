@@ -5,7 +5,7 @@
 
 int main()
 {
-	char buffer[16];
+	int buffer[2] = {0};
 	int liaison[2];
 	pipe(liaison);
 	
@@ -16,17 +16,19 @@ int main()
 	if(fils < 0){perror("Fork error !\n");}
 	else if(fils == 0)
 	{
-		char msg[] = "Hello Papa !";
+		int n[2] = {10,50};
 		close(liaison[0]);
-		write(liaison[1], msg, sizeof(msg));
+		write(liaison[1], n, sizeof(int));
+		write(liaison[1], n+1, sizeof(int));
 		close(liaison[1]);
 	}
 	else
 	{
 		close(liaison[1]);
-		read(liaison[0], buffer, 16);
+		read(liaison[0], buffer, sizeof(int));
+		read(liaison[0], buffer+1, sizeof(int));
 		close(liaison[0]);
-		printf("Message du fils: %s\n", buffer);
+		printf("Message du fils: %d %d\n", buffer[0] , buffer[1]);
 		wait(NULL);
 	}
 	
