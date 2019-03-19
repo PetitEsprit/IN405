@@ -21,10 +21,10 @@ typedef struct {
 
 // Structure contenant les informations nécessaires au thread
 typedef struct {
-							//< Tableau d'entiers à traiter
-							//< Indice de début de traitement
-							//< Indice de fin de traitement (non compris)
-							//< Résultat local
+	int *tab				//< Tableau d'entiers à traiter
+	int start;				//< Indice de début de traitement
+	int end;				//< Indice de fin de traitement (non compris)
+	int res;				//< Résultat local
 } message_t;
 
 // Alias de pointeurs de fonction
@@ -33,14 +33,23 @@ typedef int (* ptrVerif) (int *, int, int);
 // Fonction thread -- calcule la somme locale d'un tableau
 // \param	arg 			Message transmis par le thread père
 // \return					NULL
-void * sommeTableau (void * arg) {  }
+void * sommeTableau (void * arg)
+{
+	message_t 
+}
 
 // Fin de la réduction -- calcule la somme globale
 // \param	msg				Messages issus de l'exécution des threads,
 //							contiennent les résultats locaux
 // \param	nbThreads		Nombre de threads, et donc de messages
 // \return					Résultat global
-int reducSomme (message_t * msg, int nbThreads) {  }
+int reducSomme (message_t * msg, int nbThreads)
+{
+	int s = 0;
+	for(int i=0; i<nbThreads; i++)
+		s += msg[i].res;
+	return s;
+}
 
 // Fonction thread -- calcule la moyenne locale d'un tableau
 // \param	arg 			Message transmis par le thread père
@@ -146,7 +155,20 @@ int verifMin (int * tableau, int tailleTableau, int resultat) {
 // \param	argc			Nombre d'arguments
 // \param	argv			Arguments
 // \return					Structure de données des arguments
-arg_t analyseArguments (int argc, char ** argv) {  }
+arg_t analyseArguments (int argc, char ** argv)
+{
+	arg_t a = {0, 0, 0};
+	if(argc == 4)
+	{
+		a.nbThreads = atoi(argv[1]);
+		a.tailleTableau = atoi(argv[2]);
+		switch(argv[3][0]))
+		{
+			case:
+		}
+	}
+	return a
+}
 
 // NE PAS TOUCHER
 // Récupération de la fonction de vérification à partir de l'opcode
@@ -167,7 +189,13 @@ ptrVerif decodeOpcodeVerif (const opcode_t o) {
 // Génération du tableau avec des entiers compris entre 1 et 100.
 // \param	tailleTableau	Taille du tableau d'entiers
 // \return					Tableau d'entiers
-int * genereTableau (int tailleTableau) {  }
+int * genereTableau (int tailleTableau)
+{  
+	int *t = (int*)malloc(sizeof(int) * tailleTableau);
+	for(int i=0; i<tailleTableau; i++)
+		t[i] = rand()%100 + 1;
+	return t;
+}
 
 // Fonction chargée de la réduction multi-threadé, elle va initialiser les
 // différentes variables utilisées par les threads (tableau d'entier, messages,
@@ -176,12 +204,23 @@ int * genereTableau (int tailleTableau) {  }
 // \param	arg 			Arguments du programme décodés
 void programmePrincipal (const arg_t arg) {
 	// Déclaration des variables
-	int * tab, res;
+	int * tab, res;pthread_t id[arg.nbThreads];message_t *m;
 
 	// Allocation de la mémoire
-	
+	tab = genereTableau(arg.tailleTableau);
 	// Initialisation des variables et création des threads
-
+	
+	m = (message_t*)malloc(sizeof(message_t) * arg.nbThreads);
+	
+	switch() //Ujtilisation pointeur fonction
+		{
+			pthread_create(id+i, NULL, );
+		}
+	for(int i=0; i<arg.nbThreads; i++)
+	{
+		
+		
+	}
 	// Jointure
 
 	// Réduction et affichage du résultat
@@ -193,6 +232,7 @@ void programmePrincipal (const arg_t arg) {
 	// FIN
 
 	// Libération de la mémoire
+	free(tab);
 }
 
 // NE PAS TOUCHER

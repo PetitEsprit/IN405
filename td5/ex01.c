@@ -66,7 +66,7 @@ int main(int argc, char **argv)
 	pthread_create(id, NULL, hello, NULL);
 	pthread_create(id+1, NULL, printalea1, &alea1);
 	pthread_create(id+2, NULL, printalea2, NULL);
-	pthread_create(id+3, NULL, printalea3, &alea3);
+	pthread_create(id+3, NULL, printalea3, alea3);
 	pthread_create(id+4, NULL, printalea4, alea4);
 	pthread_join(id[0], NULL);
 	pthread_join(id[1], NULL);
