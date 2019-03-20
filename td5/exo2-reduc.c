@@ -21,7 +21,7 @@ typedef struct {
 
 // Structure contenant les informations nécessaires au thread
 typedef struct {
-	int *tab				//< Tableau d'entiers à traiter
+	int *tab;				//< Tableau d'entiers à traiter
 	int start;				//< Indice de début de traitement
 	int end;				//< Indice de fin de traitement (non compris)
 	int res;				//< Résultat local
@@ -35,7 +35,8 @@ typedef int (* ptrVerif) (int *, int, int);
 // \return					NULL
 void * sommeTableau (void * arg)
 {
-	message_t 
+	int *tab;
+	return NULL;
 }
 
 // Fin de la réduction -- calcule la somme globale
@@ -162,12 +163,26 @@ arg_t analyseArguments (int argc, char ** argv)
 	{
 		a.nbThreads = atoi(argv[1]);
 		a.tailleTableau = atoi(argv[2]);
-		switch(argv[3][0]))
+		switch(argv[3][0])
 		{
-			case:
+			case '+':
+				a.code = OCD_SOMME;
+			break;
+			case '/':
+				a.code = OCD_MOYENNE;
+			break;
+			case 'M':
+				a.code = OCD_MAX;
+			break;
+			case 'm':
+				a.code = OCD_MIN;
+			break;
+			default:
+				printf("Opcode non reconnue !\n");
+			break;
 		}
 	}
-	return a
+	return a;
 }
 
 // NE PAS TOUCHER
@@ -204,27 +219,58 @@ int * genereTableau (int tailleTableau)
 // \param	arg 			Arguments du programme décodés
 void programmePrincipal (const arg_t arg) {
 	// Déclaration des variables
-	int * tab, res;pthread_t id[arg.nbThreads];message_t *m;
+	int * tab, res, decal;
+	pthread_t id[arg.nbThreads];
+	message_t *m;
+	void *(*operation) (void *); int (*reduc) (message_t *, int);
 
 	// Allocation de la mémoire
 	tab = genereTableau(arg.tailleTableau);
 	// Initialisation des variables et création des threads
-	
+	decal = arg.tailleTableau / arg.nbThreads;
 	m = (message_t*)malloc(sizeof(message_t) * arg.nbThreads);
 	
-	switch() //Ujtilisation pointeur fonction
-		{
-			pthread_create(id+i, NULL, );
-		}
 	for(int i=0; i<arg.nbThreads; i++)
 	{
+		m[i].tab = tab;
+		m[i].start = decal*i;
+		m[i].end = decal*(i+1);
+		m[i].res = 0;
+	}
+	if(m[arg.nbThreads-1].end != arg.tailleTableau)
+		m[arg.nbThreads-1].end = arg.tailleTableau;
 		
-		
+	switch(arg.code)
+	{
+		case OCD_SOMME: 
+			operation = sommeTableau;
+			reduc = reducSomme;
+		break;
+		case OCD_MOYENNE:
+			operation = moyenneTableau;
+			reduc = reducMoyenne;
+		break;
+		case OCD_MAX:
+			operation = maxTableau;
+			reduc = reducMax;
+		break;
+		case OCD_MIN:
+			operation = minTableau;
+			reduc = reducMin;
+		break;
+	}
+	
+	for(int i=0; i<arg.nbThreads; i++)
+	{
+		pthread_create(id+i, NULL, operation, m+i);
 	}
 	// Jointure
-
+	for(int i=0; i<arg.nbThreads; i++)
+	{
+		pthread_join(id[i], NULL);
+	}
 	// Réduction et affichage du résultat
-
+	reduc(m, arg.nbThreads);
 	// NE PAS TOUCHER
 	if ( (* (decodeOpcodeVerif (arg.code) ) ) (tab, arg.tailleTableau, res) )
 		printf ("Le resultat est juste.\n");
