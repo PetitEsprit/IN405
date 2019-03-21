@@ -35,7 +35,11 @@ typedef int (* ptrVerif) (int *, int, int);
 // \return					NULL
 void * sommeTableau (void * arg)
 {
-	int *tab;
+	message_t *m = (message_t*)arg;
+	for(int i=m->start; i<m->end; i++)
+	{
+		m->res += m->tab[i];
+	}
 	return NULL;
 }
 
@@ -55,14 +59,30 @@ int reducSomme (message_t * msg, int nbThreads)
 // Fonction thread -- calcule la moyenne locale d'un tableau
 // \param	arg 			Message transmis par le thread père
 // \return					NULL
-void * moyenneTableau (void * arg) {  }
+void * moyenneTableau (void * arg)
+{  
+	message_t *m = (message_t*)arg;
+	for(int i=m->start; i<m->end; i++)
+	{
+		m->res += m->tab[i];
+	}
+	m->res /= (m->end - m->start);
+	return NULL;
+}
 
 // Fin de la réduction -- calcule la moyenne globale
 // \param	msg				Messages issus de l'exécution des threads,
 //							contiennent les résultats locaux
 // \param	nbThreads		Nombre de threads, et donc de messages
 // \return					Résultat global
-int reducMoyenne (message_t * msg, int nbThreads) {  }
+int reducMoyenne (message_t * msg, int nbThreads)
+{
+	int s = 0;
+	for(int i=0; i<nbThreads; i++)
+		s += msg[i].res;
+	s /= nbThreads;
+	return s;
+}
 
 // Fonction thread -- calcule le maximum local d'un tableau
 // \param	arg 			Message transmis par le thread père
@@ -212,6 +232,27 @@ int * genereTableau (int tailleTableau)
 	return t;
 }
 
+void debugPrintTab(int *t, int taille)
+{
+	
+	for(int i=0; i<taille; i++)
+	{
+		printf("%d ", t[i]);
+	}
+	printf("\n");
+}
+
+void debugPrintTabMsg(message_t *m, int taille)
+{
+	for(int i=0; i<taille; i++)
+	{
+		printf("MSG No%d:\n", i);
+		printf("\tstart: %d\n", m[i].start);
+		printf("\tend: %d\n", m[i].end);
+		printf("\tres: %d\n", m[i].res);
+	}
+}
+
 // Fonction chargée de la réduction multi-threadé, elle va initialiser les
 // différentes variables utilisées par les threads (tableau d'entier, messages,
 // etc.) puis créer les threads. Une fois l'exécution des threads terminée et
@@ -270,13 +311,16 @@ void programmePrincipal (const arg_t arg) {
 		pthread_join(id[i], NULL);
 	}
 	// Réduction et affichage du résultat
-	reduc(m, arg.nbThreads);
+	res = reduc(m, arg.nbThreads);
 	// NE PAS TOUCHER
 	if ( (* (decodeOpcodeVerif (arg.code) ) ) (tab, arg.tailleTableau, res) )
 		printf ("Le resultat est juste.\n");
 	else printf ("Le resultat est faux.\n");
 	// FIN
-
+	
+	debugPrintTab(tab, arg.tailleTableau);
+	debugPrintTabMsg(m, arg.nbThreads);
+	printf("res: %d\n", res);
 	// Libération de la mémoire
 	free(tab);
 }
