@@ -50,10 +50,10 @@ void * sommeTableau (void * arg)
 // \return					Résultat global
 int reducSomme (message_t * msg, int nbThreads)
 {
-	int s = 0;
+	int r = 0;
 	for(int i=0; i<nbThreads; i++)
-		s += msg[i].res;
-	return s;
+		r += msg[i].res;
+	return r;
 }
 
 // Fonction thread -- calcule la moyenne locale d'un tableau
@@ -66,7 +66,9 @@ void * moyenneTableau (void * arg)
 	{
 		m->res += m->tab[i];
 	}
-	m->res /= (m->end - m->start);
+	if((m->end - m->start) != 0)
+		m->res /= (m->end - m->start);
+	else m->res /= 1;
 	return NULL;
 }
 
@@ -77,36 +79,71 @@ void * moyenneTableau (void * arg)
 // \return					Résultat global
 int reducMoyenne (message_t * msg, int nbThreads)
 {
-	int s = 0;
+	int r = 0;
 	for(int i=0; i<nbThreads; i++)
-		s += msg[i].res;
-	s /= nbThreads;
-	return s;
+		r += msg[i].res;
+	r /= nbThreads;
+	if(msg[nbThreads-1].start == 0) //patch tout pourri
+		r = msg[nbThreads-1].res;
+	return r;
 }
 
 // Fonction thread -- calcule le maximum local d'un tableau
 // \param	arg 			Message transmis par le thread père
 // \return					NULL
-void * maxTableau (void * arg) {  }
+void * maxTableau (void * arg)
+{
+	message_t *m = (message_t*)arg;
+	for(int i=m->start; i<m->end; i++)
+	{
+		if(m->res < m->tab[i])
+			m->res = m->tab[i];
+	}
+	return NULL;
+}
 
 // Fin de la réduction -- calcule le maximum global
 // \param	msg				Messages issus de l'exécution des threads,
 //							contiennent les résultats locaux
 // \param	nbThreads		Nombre de threads, et donc de messages
 // \return					Résultat global
-int reducMax (message_t * msg, int nbThreads) {  }
+int reducMax (message_t * msg, int nbThreads)
+{
+	int r = 0;
+	for(int i=0; i<nbThreads; i++)
+		if(r < msg[i].res)
+			r = msg[i].res;
+	return r;
+}
 
 // Fonction thread -- calcule le minimum local d'un tableau
 // \param	arg 			Message transmis par le thread père
 // \return					NULL
-void * minTableau (void * arg) {  }
+void * minTableau (void * arg)
+{
+	message_t *m = (message_t*)arg;
+	m->res = 100;
+	for(int i=m->start; i<m->end; i++)
+	{
+		if(m->res > m->tab[i])
+			m->res = m->tab[i];
+	}
+	return NULL;
+}
 
 // Fin de la réduction -- calcule le minimum global
 // \param	msg				Messages issus de l'exécution des threads,
 //							contiennent les résultats locaux
 // \param	nbThreads		Nombre de threads, et donc de messages
 // \return					Résultat global
-int reducMin (message_t * msg, int nbThreads) {  }
+int reducMin (message_t * msg, int nbThreads)
+{
+	int r = 100;
+	for(int i=0; i<nbThreads; i++)
+		if(r > msg[i].res)
+			r = msg[i].res;
+	return r;
+}
 
 // NE PAS TOUCHER
 // Fonction de vérification -- somme des éléments du tableau
