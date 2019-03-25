@@ -23,8 +23,10 @@ typedef struct {
 typedef struct {
 	int *tab;				//< Tableau d'entiers à traiter
 	int start;				//< Indice de début de traitement
-	int end;				//< Indice de fin de traitement (non compris)
+	int decal;				
+	int taille;
 	int res;				//< Résultat local
+	pthread_mutex_t mutex;
 } message_t;
 
 // Alias de pointeurs de fonction
@@ -36,10 +38,24 @@ typedef int (* ptrVerif) (int *, int, int);
 void * sommeTableau (void * arg)
 {
 	message_t *m = (message_t*)arg;
-	for(int i=m->start; i<m->end; i++)
+	int start, end, tmp = 0;
+	
+	pthread_mutex_lock(&m->mutex);
+	start = m->start;
+	
+	if((m->start + m->decal) > m->taille) end = m->taille;
+	else end = m->start + m->decal;
+	
+	pthread_mutex_unlock(&m->mutex);
+	
+	for(int i= start;i<end;i++)
 	{
-		m->res += m->tab[i];
+		tmp += m->tab[i];
 	}
+	pthread_mutex_lock(&m->mutex);
+	m->res = tmp;
+	m->start = end;
+	pthread_mutex_unlock(&m->mutex);
 	return NULL;
 }
 
@@ -50,10 +66,7 @@ void * sommeTableau (void * arg)
 // \return					Résultat global
 int reducSomme (message_t * msg, int nbThreads)
 {
-	int r = 0;
-	for(int i=0; i<nbThreads; i++)
-		r += msg[i].res;
-	return r;
+	return msg->res;
 }
 
 // Fonction thread -- calcule la moyenne locale d'un tableau
@@ -61,14 +74,6 @@ int reducSomme (message_t * msg, int nbThreads)
 // \return					NULL
 void * moyenneTableau (void * arg)
 {  
-	message_t *m = (message_t*)arg;
-	for(int i=m->start; i<m->end; i++)
-	{
-		m->res += m->tab[i];
-	}
-	if((m->end - m->start) != 0)
-		m->res /= (m->end - m->start);
-	else m->res /= 1;
 	return NULL;
 }
 
@@ -79,13 +84,7 @@ void * moyenneTableau (void * arg)
 // \return					Résultat global
 int reducMoyenne (message_t * msg, int nbThreads)
 {
-	int r = 0;
-	for(int i=0; i<nbThreads; i++)
-		r += msg[i].res;
-	r /= nbThreads;
-	if(msg[nbThreads-1].start == 0) //patch tout pourri
-		r = msg[nbThreads-1].res;
-	return r;
+	return 0;
 }
 
 // Fonction thread -- calcule le maximum local d'un tableau
@@ -93,12 +92,6 @@ int reducMoyenne (message_t * msg, int nbThreads)
 // \return					NULL
 void * maxTableau (void * arg)
 {
-	message_t *m = (message_t*)arg;
-	for(int i=m->start; i<m->end; i++)
-	{
-		if(m->res < m->tab[i])
-			m->res = m->tab[i];
-	}
 	return NULL;
 }
 
@@ -109,11 +102,7 @@ void * maxTableau (void * arg)
 // \return					Résultat global
 int reducMax (message_t * msg, int nbThreads)
 {
-	int r = 0;
-	for(int i=0; i<nbThreads; i++)
-		if(r < msg[i].res)
-			r = msg[i].res;
-	return r;
+	return 0;
 }
 
 // Fonction thread -- calcule le minimum local d'un tableau
@@ -121,13 +110,6 @@ int reducMax (message_t * msg, int nbThreads)
 // \return					NULL
 void * minTableau (void * arg)
 {
-	message_t *m = (message_t*)arg;
-	m->res = 100;
-	for(int i=m->start; i<m->end; i++)
-	{
-		if(m->res > m->tab[i])
-			m->res = m->tab[i];
-	}
 	return NULL;
 }
 
@@ -138,11 +120,7 @@ void * minTableau (void * arg)
 // \return					Résultat global
 int reducMin (message_t * msg, int nbThreads)
 {
-	int r = 100;
-	for(int i=0; i<nbThreads; i++)
-		if(r > msg[i].res)
-			r = msg[i].res;
-	return r;
+	return 0;
 }
 
 // NE PAS TOUCHER
@@ -279,17 +257,6 @@ void debugPrintTab(int *t, int taille)
 	printf("\n");
 }
 
-void debugPrintTabMsg(message_t *m, int taille)
-{
-	for(int i=0; i<taille; i++)
-	{
-		printf("MSG No%d:\n", i);
-		printf("\tstart: %d\n", m[i].start);
-		printf("\tend: %d\n", m[i].end);
-		printf("\tres: %d\n", m[i].res);
-	}
-}
-
 // Fonction chargée de la réduction multi-threadé, elle va initialiser les
 // différentes variables utilisées par les threads (tableau d'entier, messages,
 // etc.) puis créer les threads. Une fois l'exécution des threads terminée et
@@ -299,25 +266,19 @@ void programmePrincipal (const arg_t arg) {
 	// Déclaration des variables
 	int * tab, res, decal;
 	pthread_t id[arg.nbThreads];
-	message_t *m;
+	message_t m;
 	void *(*operation) (void *); int (*reduc) (message_t *, int);
 
 	// Allocation de la mémoire
 	tab = genereTableau(arg.tailleTableau);
 	// Initialisation des variables et création des threads
-	decal = arg.tailleTableau / arg.nbThreads;
-	m = (message_t*)malloc(sizeof(message_t) * arg.nbThreads);
-	
-	for(int i=0; i<arg.nbThreads; i++)
-	{
-		m[i].tab = tab;
-		m[i].start = decal*i;
-		m[i].end = decal*(i+1);
-		m[i].res = 0;
-	}
-	if(m[arg.nbThreads-1].end != arg.tailleTableau)
-		m[arg.nbThreads-1].end = arg.tailleTableau;
-		
+
+	m.tab = tab;
+	m.start = 0;
+	m.decal = arg.tailleTableau / arg.nbThreads;
+	m.taille = arg.tailleTableau;
+	m.res = 0;
+
 	switch(arg.code)
 	{
 		case OCD_SOMME: 
@@ -339,16 +300,14 @@ void programmePrincipal (const arg_t arg) {
 	}
 	
 	for(int i=0; i<arg.nbThreads; i++)
-	{
-		pthread_create(id+i, NULL, operation, m+i);
-	}
+		pthread_create(id+i, NULL, operation, &m);
+
 	// Jointure
 	for(int i=0; i<arg.nbThreads; i++)
-	{
 		pthread_join(id[i], NULL);
-	}
+
 	// Réduction et affichage du résultat
-	res = reduc(m, arg.nbThreads);
+	res = reduc(&m, arg.nbThreads);
 	// NE PAS TOUCHER
 	if ( (* (decodeOpcodeVerif (arg.code) ) ) (tab, arg.tailleTableau, res) )
 		printf ("Le resultat est juste.\n");
@@ -356,7 +315,6 @@ void programmePrincipal (const arg_t arg) {
 	// FIN
 	
 	debugPrintTab(tab, arg.tailleTableau);
-	debugPrintTabMsg(m, arg.nbThreads);
 	printf("res: %d\n", res);
 	// Libération de la mémoire
 	free(tab);
