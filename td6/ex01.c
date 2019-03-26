@@ -23,10 +23,9 @@ typedef struct {
 typedef struct {
 	int *tab;				//< Tableau d'entiers à traiter
 	int start;				//< Indice de début de traitement
-	int decal;				
-	int taille;
-	int res;				//< Résultat local
-	pthread_mutex_t mutex;
+	int end;				//< Indice de fin de traitement (non compris)
+	int *res;				//< Résultat local
+	pthread_mutex_t *ptrmut;
 } message_t;
 
 // Alias de pointeurs de fonction
@@ -38,36 +37,16 @@ typedef int (* ptrVerif) (int *, int, int);
 void * sommeTableau (void * arg)
 {
 	message_t *m = (message_t*)arg;
-	int start, end, tmp = 0;
-	
-	pthread_mutex_lock(&m->mutex);
-	start = m->start;
-	
-	if((m->start + m->decal) > m->taille) end = m->taille;
-	else end = m->start + m->decal;
-	
-	pthread_mutex_unlock(&m->mutex);
-	
-	for(int i= start;i<end;i++)
+	for(int i=m->start; i<m->end; i++)
 	{
-		tmp += m->tab[i];
+		pthread_mutex_lock(m->ptrmut);
+		*(m->res) += m->tab[i];
+		printf("res: %d\n", *(m->res));
+		pthread_mutex_unlock(m->ptrmut);
 	}
-	pthread_mutex_lock(&m->mutex);
-	m->res = tmp;
-	m->start = end;
-	pthread_mutex_unlock(&m->mutex);
 	return NULL;
 }
 
-// Fin de la réduction -- calcule la somme globale
-// \param	msg				Messages issus de l'exécution des threads,
-//							contiennent les résultats locaux
-// \param	nbThreads		Nombre de threads, et donc de messages
-// \return					Résultat global
-int reducSomme (message_t * msg, int nbThreads)
-{
-	return msg->res;
-}
 
 // Fonction thread -- calcule la moyenne locale d'un tableau
 // \param	arg 			Message transmis par le thread père
@@ -77,15 +56,6 @@ void * moyenneTableau (void * arg)
 	return NULL;
 }
 
-// Fin de la réduction -- calcule la moyenne globale
-// \param	msg				Messages issus de l'exécution des threads,
-//							contiennent les résultats locaux
-// \param	nbThreads		Nombre de threads, et donc de messages
-// \return					Résultat global
-int reducMoyenne (message_t * msg, int nbThreads)
-{
-	return 0;
-}
 
 // Fonction thread -- calcule le maximum local d'un tableau
 // \param	arg 			Message transmis par le thread père
@@ -95,32 +65,12 @@ void * maxTableau (void * arg)
 	return NULL;
 }
 
-// Fin de la réduction -- calcule le maximum global
-// \param	msg				Messages issus de l'exécution des threads,
-//							contiennent les résultats locaux
-// \param	nbThreads		Nombre de threads, et donc de messages
-// \return					Résultat global
-int reducMax (message_t * msg, int nbThreads)
-{
-	return 0;
-}
-
 // Fonction thread -- calcule le minimum local d'un tableau
 // \param	arg 			Message transmis par le thread père
 // \return					NULL
 void * minTableau (void * arg)
 {
 	return NULL;
-}
-
-// Fin de la réduction -- calcule le minimum global
-// \param	msg				Messages issus de l'exécution des threads,
-//							contiennent les résultats locaux
-// \param	nbThreads		Nombre de threads, et donc de messages
-// \return					Résultat global
-int reducMin (message_t * msg, int nbThreads)
-{
-	return 0;
 }
 
 // NE PAS TOUCHER
@@ -257,6 +207,17 @@ void debugPrintTab(int *t, int taille)
 	printf("\n");
 }
 
+void debugPrintTabMsg(message_t *m, int taille)
+{
+	for(int i=0; i<taille; i++)
+	{
+		printf("MSG No%d:\n", i);
+		printf("\tstart: %d\n", m[i].start);
+		printf("\tend: %d\n", m[i].end);
+		printf("\tres: %d\n", m[i].res);
+	}
+}
+
 // Fonction chargée de la réduction multi-threadé, elle va initialiser les
 // différentes variables utilisées par les threads (tableau d'entier, messages,
 // etc.) puis créer les threads. Une fois l'exécution des threads terminée et
@@ -264,50 +225,59 @@ void debugPrintTab(int *t, int taille)
 // \param	arg 			Arguments du programme décodés
 void programmePrincipal (const arg_t arg) {
 	// Déclaration des variables
-	int * tab, res, decal;
+	int * tab= NULL;
+	int decal,res = 0;
 	pthread_t id[arg.nbThreads];
-	message_t m;
+	message_t *m;
+	pthread_mutex_t mutex;
 	void *(*operation) (void *); int (*reduc) (message_t *, int);
 
 	// Allocation de la mémoire
 	tab = genereTableau(arg.tailleTableau);
 	// Initialisation des variables et création des threads
-
-	m.tab = tab;
-	m.start = 0;
-	m.decal = arg.tailleTableau / arg.nbThreads;
-	m.taille = arg.tailleTableau;
-	m.res = 0;
-
+	
+	decal = arg.tailleTableau / arg.nbThreads;
+	m = (message_t*)malloc(sizeof(message_t) * arg.nbThreads);
+	pthread_mutex_init(&mutex,NULL);
+	for(int i=0; i<arg.nbThreads; i++)
+	{
+		m[i].tab = tab;
+		m[i].start = decal*i;
+		m[i].end = decal*(i+1);
+		m[i].res = &res;
+		m[i].ptrmut = &mutex;
+	}
+	
+	
+	if(m[arg.nbThreads-1].end != arg.tailleTableau)
+		m[arg.nbThreads-1].end = arg.tailleTableau;
+		
 	switch(arg.code)
 	{
 		case OCD_SOMME: 
 			operation = sommeTableau;
-			reduc = reducSomme;
 		break;
 		case OCD_MOYENNE:
 			operation = moyenneTableau;
-			reduc = reducMoyenne;
 		break;
 		case OCD_MAX:
 			operation = maxTableau;
-			reduc = reducMax;
 		break;
 		case OCD_MIN:
 			operation = minTableau;
-			reduc = reducMin;
 		break;
 	}
 	
 	for(int i=0; i<arg.nbThreads; i++)
-		pthread_create(id+i, NULL, operation, &m);
-
+	{
+		pthread_create(id+i, NULL, operation, m+i);
+	}
 	// Jointure
 	for(int i=0; i<arg.nbThreads; i++)
+	{
 		pthread_join(id[i], NULL);
-
-	// Réduction et affichage du résultat
-	res = reduc(&m, arg.nbThreads);
+	}
+	
 	// NE PAS TOUCHER
 	if ( (* (decodeOpcodeVerif (arg.code) ) ) (tab, arg.tailleTableau, res) )
 		printf ("Le resultat est juste.\n");
@@ -315,6 +285,7 @@ void programmePrincipal (const arg_t arg) {
 	// FIN
 	
 	debugPrintTab(tab, arg.tailleTableau);
+	debugPrintTabMsg(m, arg.nbThreads);
 	printf("res: %d\n", res);
 	// Libération de la mémoire
 	free(tab);
